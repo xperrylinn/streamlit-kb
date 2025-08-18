@@ -2,6 +2,8 @@
 
 A powerful document search and question-answering system built with AWS Bedrock, LangChain, Vhroma, and Streamlit. Upload your documents, ask questions in natural language, and get AI-powered answers with source citations.
 
+[https://github.com/patweb99/streamlit-kb/tree/aws-strands](CLICK HERE TO USE THE STRANDS VERSION)
+
 ## ✨ Features
 
 - **📄 Multi-format Support**: Upload PDF, TXT, and Markdown files
