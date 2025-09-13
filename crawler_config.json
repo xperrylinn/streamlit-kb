@@ -1,0 +1,31 @@
+{
+  "crawler_settings": {
+    "base_url": "https://www.stepan.com/",
+    "max_workers": 5,
+    "request_delay": 1.0,
+    "max_depth": 10,
+    "timeout": 30,
+    "max_file_size": 52428800,
+    "user_agent": "StepanPDFCrawler/1.0 (Educational Purpose)",
+    "download_dir": "stepan_pdfs",
+    "log_level": "INFO"
+  },
+  "headers": {
+    "User-Agent": "Mozilla/5.0 (compatible; StepanPDFCrawler/1.0)",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Accept-Encoding": "gzip, deflate",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1"
+  },
+  "rate_limiting": {
+    "requests_per_second": 1,
+    "burst_limit": 5,
+    "backoff_factor": 1.5
+  },
+  "file_handling": {
+    "max_pdf_size_mb": 50,
+    "duplicate_handling": "rename",
+    "validate_pdfs": true
+  }
+}

@@ -1,0 +1,39 @@
+# Stepan.com Web Crawler Dependencies
+# ===================================
+
+# Core HTTP and web scraping libraries
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+urllib3>=2.0.0
+
+# AWS S3 integration
+boto3>=1.34.0
+botocore>=1.34.0
+
+# Additional utilities (if needed)
+# These are built-in Python modules but listed for reference:
+# - concurrent.futures
+# - threading
+# - queue
+# - time
+# - os
+# - pathlib
+# - logging
+# - urllib.parse
+# - urllib.robotparser
+# - datetime
+# - hashlib
+# - json
+# - csv
+# - sys
+
+# Optional: For enhanced PDF validation
+# PyPDF2>=3.0.0  # Uncomment if you want more robust PDF validation
+
+# Optional: For better HTML parsing
+# html5lib>=1.1  # Alternative HTML parser
+
+# Optional: For progress bars and enhanced CLI
+# tqdm>=4.65.0  # Progress bars
+# colorama>=0.4.6  # Colored terminal output
