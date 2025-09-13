@@ -7,3 +7,7 @@ chromadb
 tiktoken 
 python-dotenv
 PyPDF2
+pycryptodome
+
+# Note: AWS CLI must be installed separately for S3 sync functionality
+# Install with: pip install awscli or download from https://aws.amazon.com/cli/
