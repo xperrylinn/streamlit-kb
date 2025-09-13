@@ -519,8 +519,11 @@ def reindex_knowledgebase():
 
 # --- STREAMLIT APPLICATION SETUP ---
 # Configure the main page
-st.set_page_config(page_title="🧠 GenAI Bedrock Knowledgebase")
-st.title("🧠 GenAI Bedrock Knowledgebase")
+PAGE_TITLE = "⚗️🧪Chemical Finder"
+st.set_page_config(page_title=PAGE_TITLE)
+st.title(PAGE_TITLE)
+st.subheader("Search and discover chemicals with natural language queries.")
+st.write("Example: I'm looking for surfactants that have a viscosity around 4000 cps and dispersible in water.")
 
 # Initialize vectorstore loading state
 if 'vectorstore_loaded' not in st.session_state:
@@ -627,25 +630,8 @@ if 'vectorstore' not in st.session_state or not st.session_state.vectorstore_loa
             else:
                 st.error("❌ Initialization failed. Please check the error messages above.")
 else:
-    # Show sync status and manual sync option
+    # Show sync status
     st.success("✅ Knowledgebase is loaded and ready!")
-    
-    # Manual sync button for refreshing data
-    if st.button("🔄 Sync Latest from S3"):
-        with st.spinner("Syncing latest files from S3..."):
-            sync_success, sync_message = sync_s3_bucket()
-        if sync_success:
-            st.success(f"✅ {sync_message}")
-            # Re-index after sync
-            with st.spinner("Re-indexing with latest files..."):
-                success = reindex_knowledgebase()
-            if success:
-                st.success("✅ Knowledgebase updated with latest files!")
-                st.rerun()
-            else:
-                st.warning("⚠️ Sync completed but re-indexing failed")
-        else:
-            st.error(f"❌ {sync_message}")
     
     # Q&A Interface when knowledgebase is loaded
     try:
