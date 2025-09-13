@@ -1,6 +1,10 @@
 # GenAI Bedrock Knowledgebase - Simple .gitignore
 # =================================================
 
+# ---- other --------# 
+AWS_HackathonREADME.md
+stepan_pdfs/
+
 # --- SENSITIVE FILES (NEVER COMMIT THESE!) ---
 .env
 .env.*
