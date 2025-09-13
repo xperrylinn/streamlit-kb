@@ -1,10 +1,11 @@
-## Chemical Finder Application idea
-We are building a Retrieval-Augmented Generation (RAG) application for Stepan Company that enables users to search for chemicals and formulations using natural language. Instead of relying on exact product names or technical filters, users can type queries like “a biodegradable surfactant for a high-foam dishwashing liquid” or “non-ionic emulsifier for agricultural spray applications.”
+## AI-powred Chemical Search and Discovery Application Using RAG and AWS
+
+We are building a Retrieval-Augmented Generation (RAG) application for Stepan Company that enables users to search for chemicals and formulations using AI models in AWS. Instead of relying on exact product names or technical filters, users can type queries like “a biodegradable surfactant for a high-foam dishwashing liquid” or “non-ionic emulsifier for agricultural spray applications.”
 The system will:
 Ingest and index Stepan’s product catalog, technical datasheets, and formulation guides in a vector database.
 
 
-Use an LLM to understand user intent and retrieve the most relevant products.
+Use a RAG application understand user intent and retrieve the most relevant products.
 
 
 Generate summaries explaining why each product matches, highlighting key properties, performance data, and regulatory notes.
@@ -13,6 +14,7 @@ Generate summaries explaining why each product matches, highlighting key propert
 This application will make it faster and easier for customers, sales teams, and formulators to find the right products, improving product discovery, reducing support requests, and streamlining decision-making.
 
 ## Problem Statement
+
 Stepan Company maintains a large and complex catalog of specialty chemicals and formulations serving diverse markets, including cleaning products, personal care, agriculture, food, and industrial applications. Today, customers, sales teams, and formulators often struggle to quickly locate the right chemical ingredients that meet specific technical, regulatory, or performance criteria.
 Existing search tools rely on keyword matching and static filters, which require users to know the exact product name, chemical class, or specification beforehand. This results in:
 Inefficient Product Discovery: Users spend significant time browsing datasheets or contacting technical support to identify suitable products.
@@ -44,5 +46,7 @@ From the the URL below find “Product Bulletin” PDF files from the Product Fi
 https://www.stepan.com/content/stepan-dot-com/en/products-markets/product-finder.html
 
 
-
-
+- Web Scrapper : Scrapes the urls for updated information related to chemicals, save the pdfs into S3 buckets. The data in S3 is then split into vectors and saves the embeddings into vector database.
+- AI agents : Build two AI agents , one to retrive relevant information from static documents stored in S3 and another AI agent is scraping the updated information from web.
+- When user asks the query, AI model convert the query into vector query, searches for the answers against the vector databse using semantic search (eg cosine similarity) and give the context specific and up-to-date information.
+- In AWS, we use the S3 buckets, AWS Bedrock to use the AI Models 
