@@ -92,15 +92,16 @@ CHROMA_DIR = os.path.join(TEMP_DIR, "chroma_db")
 # atexit.register(cleanup_temp_dir)
 
 # AWS Bedrock model IDs - these are the AI models we'll use
-AWS_BEDROCK_EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"  # For converting text to vectors
-AWS_BEDROCK_LLM_MODEL_ID = "us.amazon.nova-micro-v1:0"          # For answering questions
+AWS_BEDROCK_EMBEDDING_MODEL_ID = (
+    "amazon.titan-embed-text-v2:0"  # For converting text to vectors
+)
+AWS_BEDROCK_LLM_MODEL_ID = "us.amazon.nova-micro-v1:0"  # For answering questions
 AWS_REGION = "us-west-2"  # AWS region where Bedrock is available
 
 # --- AI COMPONENTS INITIALIZATION ---
 # Initialize the embedding model (converts text to numerical vectors for similarity search)
 embedding_model = BedrockEmbeddings(
-    region_name="us-west-2",
-    model_id=AWS_BEDROCK_EMBEDDING_MODEL_ID
+    region_name="us-west-2", model_id=AWS_BEDROCK_EMBEDDING_MODEL_ID
 )
 
 # Initialize text splitter (breaks documents into smaller chunks for processing)
@@ -108,25 +109,26 @@ embedding_model = BedrockEmbeddings(
 # chunk_overlap=100: Overlapping chunks to maintain context
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
+
 # --- PDF PROCESSING FUNCTIONS ---
 def extract_text_from_pdf(pdf_path):
     """
     Extract text content from a PDF file using PyPDF2
     Handles both encrypted and unencrypted PDFs
-    
+
     Args:
         pdf_path (str): Path to the PDF file
-        
+
     Returns:
         str: Extracted text content, or None if extraction fails
     """
     text = ""
-    
+
     try:
         # Open PDF file in binary read mode
-        with open(pdf_path, 'rb') as file:
+        with open(pdf_path, "rb") as file:
             pdf_reader = PyPDF2.PdfReader(file)
-            
+
             # Check if PDF is encrypted
             if pdf_reader.is_encrypted:
                 print(f"🔒 PDF is encrypted: {pdf_path}")
@@ -137,7 +139,7 @@ def extract_text_from_pdf(pdf_path):
                 except Exception as decrypt_error:
                     print(f"❌ Failed to decrypt {pdf_path}: {decrypt_error}")
                     return None
-            
+
             # Loop through each page in the PDF
             for page_num, page in enumerate(pdf_reader.pages):
                 try:
@@ -147,23 +149,26 @@ def extract_text_from_pdf(pdf_path):
                     else:
                         print(f"⚠️ No text found on page {page_num + 1} of {pdf_path}")
                 except Exception as page_error:
-                    print(f"⚠️ Error extracting text from page {page_num + 1} of {pdf_path}: {page_error}")
+                    print(
+                        f"⚠️ Error extracting text from page {page_num + 1} of {pdf_path}: {page_error}"
+                    )
                     continue
-                    
+
     except Exception as e:
         print(f"❌ Error extracting text from PDF {pdf_path}: {e}")
         return None
-    
+
     return text.strip()
+
 
 def convert_pdf_to_text(uploaded_file, filename):
     """
     Convert an uploaded PDF file to text and save it as a .txt file
-    
+
     Args:
         uploaded_file: Streamlit uploaded file object
         filename (str): Original filename of the uploaded PDF
-        
+
     Returns:
         tuple: (text_filename, text_length) or (None, 0) if conversion fails
     """
@@ -172,23 +177,23 @@ def convert_pdf_to_text(uploaded_file, filename):
         temp_pdf_path = os.path.join(DATA_DIR, f"temp_{filename}")
         with open(temp_pdf_path, "wb") as f:
             f.write(uploaded_file.read())
-        
+
         # Step 2: Extract text from the temporary PDF
         text = extract_text_from_pdf(temp_pdf_path)
-        
+
         # Step 3: Clean up the temporary PDF file
         os.remove(temp_pdf_path)
-        
+
         if text:
             # Step 4: Save extracted text as a .txt file
-            text_filename = filename.replace('.pdf', '.txt')
+            text_filename = filename.replace(".pdf", ".txt")
             text_path = os.path.join(DATA_DIR, text_filename)
             with open(text_path, "w", encoding="utf-8") as f:
                 f.write(text)
             return text_filename, len(text)
         else:
             return None, 0
-            
+
     except Exception as e:
         st.error(f"Error processing PDF {filename}: {e}")
         # Clean up temporary file if something went wrong
@@ -197,39 +202,43 @@ def convert_pdf_to_text(uploaded_file, filename):
             os.remove(temp_pdf_path)
         return None, 0
 
+
 # --- DATABASE MANAGEMENT FUNCTIONS ---
 def sync_s3_bucket():
     """
     Sync PDF files from S3 bucket to local directory using AWS CLI sync
-    
+
     Returns:
         tuple: (success, message) - sync status and message
     """
     try:
         # Ensure local directory exists
         os.makedirs(DATA_DIR, exist_ok=True)
-        
+
         # Use AWS CLI sync command for efficient syncing
         import subprocess
-        
+
         s3_uri = f"s3://{S3_BUCKET_NAME}/{S3_PREFIX}"
-        
+
         print(f"🔄 Syncing files from {s3_uri} to {DATA_DIR}")
-        
+
         # Run AWS sync command
         result = subprocess.run(
             [
-                "aws", "s3", "sync",
+                "aws",
+                "s3",
+                "sync",
                 s3_uri,
                 DATA_DIR,
-                "--region", AWS_REGION_S3,
-                "--delete"  # Remove local files that don't exist in S3
+                "--region",
+                AWS_REGION_S3,
+                "--delete",  # Remove local files that don't exist in S3
             ],
             capture_output=True,
             text=True,
-            timeout=300  # 5 minute timeout
+            timeout=300,  # 5 minute timeout
         )
-        
+
         if result.returncode == 0:
             print(f"✅ S3 sync completed successfully")
             print(f"📁 Output: {result.stdout}")
@@ -237,7 +246,7 @@ def sync_s3_bucket():
         else:
             print(f"❌ S3 sync failed: {result.stderr}")
             return False, f"S3 sync failed: {result.stderr}"
-            
+
     except subprocess.TimeoutExpired:
         print("❌ S3 sync timed out after 5 minutes")
         return False, "S3 sync timed out"
@@ -248,15 +257,16 @@ def sync_s3_bucket():
         print(f"❌ Error during S3 sync: {e}")
         return False, f"Error during S3 sync: {e}"
 
+
 def check_s3_credentials():
     """
     Check if AWS credentials are properly configured
-    
+
     Returns:
         bool: True if credentials are valid, False otherwise
     """
     try:
-        s3_client = boto3.client('s3', region_name=AWS_REGION_S3)
+        s3_client = boto3.client("s3", region_name=AWS_REGION_S3)
         # Try to list objects to verify credentials
         s3_client.list_objects_v2(Bucket=S3_BUCKET_NAME, MaxKeys=1)
         print("✅ AWS credentials verified")
@@ -265,7 +275,7 @@ def check_s3_credentials():
         print("❌ AWS credentials not found")
         return False
     except ClientError as e:
-        if e.response['Error']['Code'] == 'NoSuchBucket':
+        if e.response["Error"]["Code"] == "NoSuchBucket":
             print(f"❌ S3 bucket '{S3_BUCKET_NAME}' not found")
         else:
             print(f"❌ AWS credentials error: {e}")
@@ -274,10 +284,11 @@ def check_s3_credentials():
         print(f"❌ Error checking AWS credentials: {e}")
         return False
 
+
 def create_new_chroma_dir():
     """
     Create a new ChromaDB directory in the temp space
-    
+
     Returns:
         str: Path to the new ChromaDB directory
     """
@@ -287,20 +298,21 @@ def create_new_chroma_dir():
     os.makedirs(new_chroma_dir, exist_ok=True)
     return new_chroma_dir
 
+
 def safe_remove_directory(directory):
     """
     Safely remove a directory with proper error handling
     With temp directories, this should be much simpler and more reliable
-    
+
     Args:
         directory (str): Path to directory to remove
-        
+
     Returns:
         bool: True if successful, False otherwise
     """
     if not os.path.exists(directory):
         return True
-    
+
     try:
         # Since we're using temp directories, removal should be straightforward
         shutil.rmtree(directory, ignore_errors=True)
@@ -309,99 +321,105 @@ def safe_remove_directory(directory):
         print(f"Error removing directory {directory}: {e}")
         return False
 
+
 def create_vectorstore_batch(docs, embedding_model, persist_directory, batch_size=50):
     """
     Create vectorstore in batches to handle large document collections
-    
+
     Args:
         docs: List of document chunks
         embedding_model: The embedding model to use
         persist_directory: Directory to save the vectorstore
         batch_size: Number of documents to process in each batch
-        
+
     Returns:
         Chroma: The created vectorstore
     """
-    print(f"📁 Creating vectorstore with {len(docs)} documents in batches of {batch_size}")
-    
+    print(
+        f"📁 Creating vectorstore with {len(docs)} documents in batches of {batch_size}"
+    )
+
     # Process documents in batches
     vectorstore = None
     total_batches = (len(docs) + batch_size - 1) // batch_size
-    
+
     for i in range(0, len(docs), batch_size):
         batch_num = (i // batch_size) + 1
-        batch_docs = docs[i:i + batch_size]
-        
-        print(f"📊 Processing batch {batch_num}/{total_batches} ({len(batch_docs)} documents)")
-        
+        batch_docs = docs[i : i + batch_size]
+
+        print(
+            f"📊 Processing batch {batch_num}/{total_batches} ({len(batch_docs)} documents)"
+        )
+
         try:
             if vectorstore is None:
                 # Create the first batch
                 vectorstore = Chroma.from_documents(
-                    batch_docs,
-                    embedding_model,
-                    persist_directory=persist_directory
+                    batch_docs, embedding_model, persist_directory=persist_directory
                 )
                 print(f"✅ Created initial vectorstore with batch {batch_num}")
             else:
                 # Add to existing vectorstore
                 vectorstore.add_documents(batch_docs)
                 print(f"✅ Added batch {batch_num} to vectorstore")
-                
+
             # Add a small delay to prevent overwhelming the system
             time.sleep(0.1)
-                
+
         except Exception as e:
             print(f"❌ Error processing batch {batch_num}: {e}")
             # If we have a vectorstore, continue; otherwise, this is critical
             if vectorstore is None:
                 raise e
             continue
-    
+
     return vectorstore
+
 
 # --- CORE KNOWLEDGEBASE FUNCTION ---
 def process_pdfs_to_text():
     """
     Process all PDFs from the stepan_pdfs/downloads directory and convert them to text files
     Handles encrypted PDFs and provides detailed progress feedback
-    
+
     Returns:
         tuple: (processed_count, total_count, encrypted_count, failed_count) - processing statistics
     """
     # Ensure directories exist
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(PROCESSED_DIR, exist_ok=True)
-    
+
     # Get all PDF files from the downloads directory
-    pdf_files = [f for f in os.listdir(DATA_DIR) if f.lower().endswith('.pdf')]
-    
+    pdf_files = [f for f in os.listdir(DATA_DIR) if f.lower().endswith(".pdf")]
+
     if not pdf_files:
         return 0, 0, 0, 0
-    
+
     processed_count = 0
     encrypted_count = 0
     failed_count = 0
-    
+
     print(f"📁 Processing {len(pdf_files)} PDF files from {DATA_DIR}")
-    
+
     for i, pdf_file in enumerate(pdf_files, 1):
         try:
             # Check if text file already exists
-            text_filename = pdf_file.replace('.pdf', '.txt')
+            text_filename = pdf_file.replace(".pdf", ".txt")
             text_path = os.path.join(PROCESSED_DIR, text_filename)
-            
+
             if os.path.exists(text_path):
                 # Skip if already processed
                 processed_count += 1
                 if i % 50 == 0:  # Progress update every 50 files
-                    print(f"📊 Progress: {i}/{len(pdf_files)} (skipped existing: {text_filename})")
+                    print(
+                        f"📊 Progress: {i}/{len(pdf_files)} (skipped existing: {text_filename})"
+                    )
                 continue
-            
+
             # Process PDF to text
             pdf_path = os.path.join(DATA_DIR, pdf_file)
             text = extract_text_from_pdf(pdf_path)
-            
+
             if text and text.strip():
                 # Save as text file
                 with open(text_path, "w", encoding="utf-8") as f:
@@ -412,14 +430,17 @@ def process_pdfs_to_text():
             else:
                 print(f"⚠️ No text extracted from: {pdf_file}")
                 failed_count += 1
-                
+
         except Exception as e:
             print(f"❌ Error processing {pdf_file}: {e}")
             failed_count += 1
             continue
-    
-    print(f"✅ Processing complete: {processed_count} successful, {failed_count} failed")
+
+    print(
+        f"✅ Processing complete: {processed_count} successful, {failed_count} failed"
+    )
     return processed_count, len(pdf_files), encrypted_count, failed_count
+
 
 def reindex_knowledgebase():
     """
@@ -429,56 +450,62 @@ def reindex_knowledgebase():
     2. Splits them into chunks
     3. Converts chunks to vector embeddings
     4. Stores embeddings in ChromaDB for similarity search
-    
+
     Returns:
         bool: True if successful, False otherwise
     """
-    
+
     # Step 1: Process PDFs to text first
     processed_count, total_count, encrypted_count, failed_count = process_pdfs_to_text()
-    print(f"📁 Processed {processed_count}/{total_count} PDF files ({failed_count} failed)")
-    
+    print(
+        f"📁 Processed {processed_count}/{total_count} PDF files ({failed_count} failed)"
+    )
+
     # Step 2: Ensure processed directory exists
     os.makedirs(PROCESSED_DIR, exist_ok=True)
-    
+
     # Step 3: Process all documents in the processed directory
     docs = []  # List to store all document chunks
     processed_files = []  # List to track which files were processed
     max_docs = 1000  # Limit to prevent memory issues
-    
+
     # Loop through all files in the processed directory
     for filename in os.listdir(PROCESSED_DIR):
         if filename.endswith(".txt") or filename.endswith(".md"):
             try:
                 # Read the file content
-                with open(os.path.join(PROCESSED_DIR, filename), "r", encoding="utf-8") as f:
+                with open(
+                    os.path.join(PROCESSED_DIR, filename), "r", encoding="utf-8"
+                ) as f:
                     text = f.read()
-                    
+
                     if text.strip():  # Only process non-empty files
                         # Split text into chunks using the text splitter
                         splits = text_splitter.create_documents([text])
                         docs.extend(splits)
                         processed_files.append(filename)
-                        
+
                         # Limit the number of documents to prevent memory issues
                         if len(docs) >= max_docs:
-                            print(f"⚠️ Limiting to {max_docs} document chunks to prevent memory issues")
+                            print(
+                                f"⚠️ Limiting to {max_docs} document chunks to prevent memory issues"
+                            )
                             break
                     else:
                         print(f"⚠️ Skipping empty file: {filename}")
-                        
+
             except Exception as e:
                 print(f"❌ Error reading file {filename}: {e}")
                 continue
-    
+
     # Step 4: Check if we have any documents to process
     if not docs:
         print("❌ No valid documents found to index.")
         return False
-    
+
     try:
         print(f"📁 Found {len(processed_files)} file(s) in processed directory")
-        
+
         # Step 5: Create a new ChromaDB directory in temp space
         new_chroma_dir = create_new_chroma_dir()
         print(f"✅ Created new vectorstore directory: {new_chroma_dir}")
@@ -490,18 +517,18 @@ def reindex_knowledgebase():
             docs,  # The document chunks
             embedding_model,  # The embedding model (converts text to vectors)
             new_chroma_dir,  # Where to save the vector database (temp dir)
-            batch_size=100  # Process 100 documents at a time
+            batch_size=100,  # Process 100 documents at a time
         )
         print(f"✅ Created new vectorstore in {new_chroma_dir}")
 
         # Step 7: Update global variable to point to new location
-        globals()['CHROMA_DIR'] = new_chroma_dir
-        
+        globals()["CHROMA_DIR"] = new_chroma_dir
+
         # Step 8: Show success messages
         print(f"✅ Processed {len(processed_files)} files")
         print(f"✅ Created {len(docs)} document chunks")
         print(f"✅ Database saved to temporary directory")
-        
+
         # Step 9: Test the vectorstore to make sure it works
         try:
             test_results = st.session_state.vectorstore.similarity_search("test", k=1)
@@ -511,104 +538,115 @@ def reindex_knowledgebase():
             return False
 
         return True
-        
+
     except Exception as e:
         print(f"❌ Error creating vectorstore: {e}")
         print("Please check your AWS credentials and Bedrock access.")
         return False
+
 
 # --- STREAMLIT APPLICATION SETUP ---
 # Configure the main page
 PAGE_TITLE = "⚗️🧪Chemical Finder"
 st.set_page_config(page_title=PAGE_TITLE)
 st.title(PAGE_TITLE)
-st.subheader("Search and discover chemicals with natural language queries.")
-st.write("Example: I'm looking for surfactants that have a viscosity around 4000 cps and dispersible in water.")
+st.subheader("AI-powred Chemical Search and Discovery Application Using RAG and AWS")
+st.write(
+    "Example: I'm looking for surfactants that have a viscosity around 4000 cps and dispersible in water."
+)
 
 # Initialize vectorstore loading state
-if 'vectorstore_loaded' not in st.session_state:
+if "vectorstore_loaded" not in st.session_state:
     st.session_state.vectorstore_loaded = False
 
 # --- AUTOMATIC INITIALIZATION ---
 # Automatically sync from S3, process PDFs and create knowledgebase on app startup
 if not st.session_state.vectorstore_loaded:
     # Step 1: Check AWS credentials
-    st.info('🔐 Checking AWS credentials...')
+    st.info("🔐 Checking AWS credentials...")
     if not check_s3_credentials():
-        st.error('❌ AWS credentials not configured. Please check your AWS setup.')
+        st.error("❌ AWS credentials not configured. Please check your AWS setup.")
         st.session_state.vectorstore_loaded = False
     else:
         # Step 2: Sync files from S3
-        st.info('🔄 Syncing PDF files from S3 bucket...')
+        st.info("🔄 Syncing PDF files from S3 bucket...")
         sync_success, sync_message = sync_s3_bucket()
-        
+
         if not sync_success:
-            st.error(f'❌ S3 sync failed: {sync_message}')
+            st.error(f"❌ S3 sync failed: {sync_message}")
             st.session_state.vectorstore_loaded = False
         else:
-            st.success(f'✅ {sync_message}')
-            
+            st.success(f"✅ {sync_message}")
+
             # Step 3: Check if we have processed files
             os.makedirs(PROCESSED_DIR, exist_ok=True)
-            existing_files = [f for f in os.listdir(PROCESSED_DIR) if f.endswith(('.txt', '.md'))]
-            
+            existing_files = [
+                f for f in os.listdir(PROCESSED_DIR) if f.endswith((".txt", ".md"))
+            ]
+
             if existing_files and len(existing_files) > 0:
                 # We have processed files, try to load existing vectorstore or create a new one
-                st.info(f'📁 Found {len(existing_files)} processed files. Initializing knowledgebase...')
-                
+                st.info(
+                    f"📁 Found {len(existing_files)} processed files. Initializing knowledgebase..."
+                )
+
                 try:
                     success = reindex_knowledgebase()
                     if success:
                         st.session_state.vectorstore_loaded = True
                         st.session_state.vectorstore_initialized = True
-                        st.success('✅ Knowledgebase initialized successfully!')
-                        print('✅ Knowledgebase initialized successfully during startup')
+                        st.success("✅ Knowledgebase initialized successfully!")
+                        print(
+                            "✅ Knowledgebase initialized successfully during startup"
+                        )
                     else:
                         st.session_state.vectorstore_loaded = False
-                        st.error('❌ Failed to initialize knowledgebase')
-                        print('⚠️ Failed to initialize knowledgebase during startup')
+                        st.error("❌ Failed to initialize knowledgebase")
+                        print("⚠️ Failed to initialize knowledgebase during startup")
                 except Exception as e:
                     st.session_state.vectorstore_loaded = False
-                    st.error(f'❌ Error during initialization: {str(e)}')
-                    print(f'❌ Error during initialization: {e}')
+                    st.error(f"❌ Error during initialization: {str(e)}")
+                    print(f"❌ Error during initialization: {e}")
             else:
                 # No processed files, need to process PDFs first
-                st.info('🔄 Processing PDFs and initializing knowledgebase...')
-                
+                st.info("🔄 Processing PDFs and initializing knowledgebase...")
+
                 try:
                     success = reindex_knowledgebase()
                     if success:
                         st.session_state.vectorstore_loaded = True
                         st.session_state.vectorstore_initialized = True
-                        st.success('✅ Knowledgebase initialized successfully!')
-                        print('✅ Knowledgebase initialized successfully during startup')
+                        st.success("✅ Knowledgebase initialized successfully!")
+                        print(
+                            "✅ Knowledgebase initialized successfully during startup"
+                        )
                     else:
                         st.session_state.vectorstore_loaded = False
-                        st.error('❌ Failed to initialize knowledgebase')
-                        print('⚠️ Failed to initialize knowledgebase during startup')
+                        st.error("❌ Failed to initialize knowledgebase")
+                        print("⚠️ Failed to initialize knowledgebase during startup")
                 except Exception as e:
                     st.session_state.vectorstore_loaded = False
-                    st.error(f'❌ Error during initialization: {str(e)}')
-                    print(f'❌ Error during initialization: {e}')
+                    st.error(f"❌ Error during initialization: {str(e)}")
+                    print(f"❌ Error during initialization: {e}")
 
 # --- MAIN Q&A INTERFACE ---
 st.header("💬 Ask Questions")
 
 # Check if vectorstore is loaded and functional
-if 'vectorstore' not in st.session_state or not st.session_state.vectorstore_loaded:
+if "vectorstore" not in st.session_state or not st.session_state.vectorstore_loaded:
     st.error("❌ Failed to initialize knowledgebase. Please check:")
     st.write("• AWS credentials are properly configured")
     st.write("• AWS S3 and Bedrock access is enabled")
     st.write("• S3 bucket hackaton-stepan-data/stepan-pdfs is accessible")
-    
+
     # Show current PDF count
     os.makedirs(DATA_DIR, exist_ok=True)
-    pdf_files = [f for f in os.listdir(DATA_DIR) if f.lower().endswith('.pdf')]
+    pdf_files = [f for f in os.listdir(DATA_DIR) if f.lower().endswith(".pdf")]
     st.info(f"📁 Found {len(pdf_files)} PDF file(s) in stepan_pdfs/downloads/")
-    
+
     # Manual sync and retry buttons
     col1, col2 = st.columns(2)
-    
+
     with col1:
         if st.button("🔄 Sync from S3"):
             with st.spinner("Syncing files from S3..."):
@@ -618,7 +656,7 @@ if 'vectorstore' not in st.session_state or not st.session_state.vectorstore_loa
                 st.rerun()
             else:
                 st.error(f"❌ {sync_message}")
-    
+
     with col2:
         if st.button("🔄 Retry Initialization"):
             with st.spinner("Re-initializing knowledgebase..."):
@@ -628,11 +666,13 @@ if 'vectorstore' not in st.session_state or not st.session_state.vectorstore_loa
                 st.session_state.vectorstore_loaded = True
                 st.rerun()
             else:
-                st.error("❌ Initialization failed. Please check the error messages above.")
+                st.error(
+                    "❌ Initialization failed. Please check the error messages above."
+                )
 else:
     # Show sync status
     st.success("✅ Knowledgebase is loaded and ready!")
-    
+
     # Q&A Interface when knowledgebase is loaded
     try:
         # Step 1: Set up retriever (top 3 chunks)
@@ -642,8 +682,7 @@ else:
         from langchain_community.llms import Bedrock
 
         llm = ChatBedrockConverse(
-            region_name=AWS_REGION,
-            model_id=AWS_BEDROCK_LLM_MODEL_ID
+            region_name=AWS_REGION, model_id=AWS_BEDROCK_LLM_MODEL_ID
         )
 
         # Step 3: Text input for question
@@ -669,7 +708,7 @@ Context:
                         prompt,
                     ),
                     (
-                        "human", 
+                        "human",
                         question,
                     ),
                 ]
@@ -684,7 +723,7 @@ Context:
                 # Display sources
                 st.markdown("### 📄 Retrieved Context")
                 for i, doc in enumerate(docs):
-                    st.markdown(f"**Source {i+1}:**")
+                    st.markdown(f"**Source {i + 1}:**")
                     st.write(doc.page_content[:500] + "...")
     except Exception as e:
         st.error(f"Error during question answering: {e}")
