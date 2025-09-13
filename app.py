@@ -40,6 +40,8 @@ import stat
 import time
 import tempfile
 import atexit
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 # Streamlit for web interface
 import streamlit as st
@@ -105,10 +107,9 @@ embedding_model = BedrockEmbeddings(
 )
 
 # Initialize text splitter (breaks documents into smaller chunks for processing)
-# chunk_size=1000: Each chunk is ~1000 characters (increased for better context)
-# chunk_overlap=100: Overlapping chunks to maintain context
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-
+# chunk_size=2000: Each chunk is ~2000 characters (larger chunks = fewer embeddings)
+# chunk_overlap=200: Overlapping chunks to maintain context
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
 
 # --- PDF PROCESSING FUNCTIONS ---
 def extract_text_from_pdf(pdf_path):
@@ -321,6 +322,36 @@ def safe_remove_directory(directory):
         print(f"Error removing directory {directory}: {e}")
         return False
 
+def create_vectorstore_fast(docs, embedding_model, persist_directory):
+    """
+    Create vectorstore quickly using optimized approach
+
+    Args:
+        docs: List of document chunks
+        embedding_model: The embedding model to use
+        persist_directory: Directory to save the vectorstore
+
+    Returns:
+        Chroma: The created vectorstore
+    """
+    print(f"🚀 Creating vectorstore with {len(docs)} documents (optimized mode)")
+
+    try:
+        # Use the optimized Chroma creation
+        vectorstore = Chroma.from_documents(
+            docs,
+            embedding_model,
+            persist_directory=persist_directory,
+            collection_metadata={"hnsw:space": "cosine"}  # Optimize for cosine similarity
+        )
+        print(f"✅ Created vectorstore successfully")
+        return vectorstore
+
+    except Exception as e:
+        print(f"❌ Error creating vectorstore: {e}")
+        # Fallback to batch processing if fast method fails
+        print("🔄 Falling back to batch processing...")
+        return create_vectorstore_batch(docs, embedding_model, persist_directory, batch_size=100)
 
 def create_vectorstore_batch(docs, embedding_model, persist_directory, batch_size=50):
     """
@@ -467,37 +498,50 @@ def reindex_knowledgebase():
     # Step 3: Process all documents in the processed directory
     docs = []  # List to store all document chunks
     processed_files = []  # List to track which files were processed
-    max_docs = 1000  # Limit to prevent memory issues
-
-    # Loop through all files in the processed directory
-    for filename in os.listdir(PROCESSED_DIR):
-        if filename.endswith(".txt") or filename.endswith(".md"):
-            try:
-                # Read the file content
-                with open(
-                    os.path.join(PROCESSED_DIR, filename), "r", encoding="utf-8"
-                ) as f:
-                    text = f.read()
-
-                    if text.strip():  # Only process non-empty files
-                        # Split text into chunks using the text splitter
-                        splits = text_splitter.create_documents([text])
-                        docs.extend(splits)
-                        processed_files.append(filename)
-
-                        # Limit the number of documents to prevent memory issues
-                        if len(docs) >= max_docs:
-                            print(
-                                f"⚠️ Limiting to {max_docs} document chunks to prevent memory issues"
-                            )
-                            break
-                    else:
-                        print(f"⚠️ Skipping empty file: {filename}")
-
-            except Exception as e:
-                print(f"❌ Error reading file {filename}: {e}")
-                continue
-
+    max_docs = 500  # Reduced limit for faster processing
+    
+    # Get all text files and sort by size (process smaller files first for faster initial results)
+    text_files = [f for f in os.listdir(PROCESSED_DIR) if f.endswith((".txt", ".md"))]
+    
+    # Sort files by size to process smaller files first
+    file_sizes = []
+    for filename in text_files:
+        try:
+            file_path = os.path.join(PROCESSED_DIR, filename)
+            size = os.path.getsize(file_path)
+            file_sizes.append((filename, size))
+        except:
+            file_sizes.append((filename, 0))
+    
+    # Sort by size (smallest first)
+    file_sizes.sort(key=lambda x: x[1])
+    
+    print(f"📁 Processing {len(file_sizes)} files (sorted by size for optimal performance)")
+    
+    # Loop through files in size order
+    for filename, file_size in file_sizes:
+        try:
+            # Read the file content
+            with open(os.path.join(PROCESSED_DIR, filename), "r", encoding="utf-8") as f:
+                text = f.read()
+                
+                if text.strip():  # Only process non-empty files
+                    # Split text into chunks using the text splitter
+                    splits = text_splitter.create_documents([text])
+                    docs.extend(splits)
+                    processed_files.append(filename)
+                    
+                    # Limit the number of documents to prevent memory issues
+                    if len(docs) >= max_docs:
+                        print(f"⚠️ Limiting to {max_docs} document chunks for faster processing")
+                        break
+                else:
+                    print(f"⚠️ Skipping empty file: {filename}")
+                    
+        except Exception as e:
+            print(f"❌ Error reading file {filename}: {e}")
+            continue
+    
     # Step 4: Check if we have any documents to process
     if not docs:
         print("❌ No valid documents found to index.")
@@ -510,16 +554,38 @@ def reindex_knowledgebase():
         new_chroma_dir = create_new_chroma_dir()
         print(f"✅ Created new vectorstore directory: {new_chroma_dir}")
 
-        # Step 6: Create new vectorstore with embeddings using batch processing
-        print(f"📁 Creating new vectorstore in temporary directory")
-        # This is where the magic happens - documents are converted to vectors in batches
-        st.session_state.vectorstore = create_vectorstore_batch(
-            docs,  # The document chunks
-            embedding_model,  # The embedding model (converts text to vectors)
-            new_chroma_dir,  # Where to save the vector database (temp dir)
-            batch_size=100,  # Process 100 documents at a time
-        )
-        print(f"✅ Created new vectorstore in {new_chroma_dir}")
+        # Step 6: Create new vectorstore with embeddings using optimized method
+        print(f"🚀 Creating new vectorstore in temporary directory (optimized mode)")
+        
+        # Show progress indicator
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        try:
+            status_text.text("🔄 Creating embeddings and vectorstore...")
+            progress_bar.progress(0.3)
+            
+            # This is where the magic happens - documents are converted to vectors efficiently
+            st.session_state.vectorstore = create_vectorstore_fast(
+                docs,  # The document chunks
+                embedding_model,  # The embedding model (converts text to vectors)
+                new_chroma_dir  # Where to save the vector database (temp dir)
+            )
+            
+            progress_bar.progress(1.0)
+            status_text.text("✅ Vectorstore created successfully!")
+            print(f"✅ Created new vectorstore in {new_chroma_dir}")
+            
+            # Clear progress indicators after a short delay
+            time.sleep(1)
+            progress_bar.empty()
+            status_text.empty()
+            
+        except Exception as e:
+            progress_bar.progress(0.0)
+            status_text.text(f"❌ Error creating vectorstore: {str(e)}")
+            print(f"❌ Error creating vectorstore: {e}")
+            raise e
 
         # Step 7: Update global variable to point to new location
         globals()["CHROMA_DIR"] = new_chroma_dir
@@ -550,7 +616,7 @@ def reindex_knowledgebase():
 PAGE_TITLE = "⚗️🧪Chemical Finder"
 st.set_page_config(page_title=PAGE_TITLE)
 st.title(PAGE_TITLE)
-st.subheader("AI-powred Chemical Search and Discovery Application Using RAG and AWS")
+st.subheader("AI-powered Chemical Search and Discovery Application Using RAG and AWS")
 st.write(
     "Example: I'm looking for surfactants that have a viscosity around 4000 cps and dispersible in water."
 )
