@@ -48,5 +48,5 @@ https://www.stepan.com/content/stepan-dot-com/en/products-markets/product-finder
 
 - Web Scrapper : Scrapes the urls for updated information related to chemicals, save the pdfs into S3 buckets. The data in S3 is then split into vectors and saves the embeddings into vector database.
 - AI agents : Build two AI agents , one to retrive relevant information from static documents stored in S3 and another AI agent is scraping the updated information from web.
-- When user asks the query, AI model convert the query into vector query, searches for the answers against the vector databse using semantic search (eg cosine similarity) and give the context specific and up-to-date information.
-- In AWS, we use the S3 buckets, AWS Bedrock to use the AI Models 
+- When user asks the query, AI model convert the query into vector query, searches for the answers against the vector database using semantic search (eg cosine similarity) and give the context specific and up-to-date information.
+- AWs services and libraries : we use the S3 buckets, AWS Bedrock to use the AI Models, ChromaDB for vector database, PyPDF to read the PDFs
